@@ -1,0 +1,207 @@
+import random
+
+def create_deck():
+    """Создаёт и возвращает новую колоду из 52 карт."""
+    suits = ['♠', '♥', '♦', '♣']
+    ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    deck = []
+    for suit in suits:
+        for rank in ranks:
+            if rank in ['J', 'Q', 'K']:
+                value = 10
+            elif rank == 'A':
+                value = 11  # временно 11, позже корректируем
+            else:
+                value = int(rank)
+            card = {'rank': rank, 'suit': suit, 'value': value, 'hidden': False}
+            deck.append(card)
+    return deck
+
+def shuffle_deck(deck):
+    """Перемешивает колоду."""
+    random.shuffle(deck)
+    return deck
+
+def calculate_score(hand):
+    """Подсчитывает сумму очков в руке, корректно обрабатывая тузы."""
+    score = 0
+    aces = 0
+    for card in hand:
+        if card['rank'] == 'A':
+            aces += 1
+            score += 11
+        else:
+            score += card['value']
+    # Если перебор и есть тузы, заменяем 11 -> 1
+    while score > 21 and aces > 0:
+        score -= 10
+        aces -= 1
+    return score
+
+def deal_initial_cards(deck):
+    """Раздаёт по две карты игроку и дилеру. Возвращает руки и оставшуюся колоду."""
+    player_hand = []
+    dealer_hand = []
+    for _ in range(2):
+        player_hand.append(deck.pop(0))
+        dealer_hand.append(deck.pop(0))
+    # Первая карта дилера скрыта
+    dealer_hand[0]['hidden'] = True
+    return player_hand, dealer_hand, deck
+
+def display_game(player_hand, dealer_hand, show_dealer_all=False):
+    """Отображает текущее состояние игры."""
+    print("\n" + "="*40)
+    print("Ваши карты:")
+    for card in player_hand:
+        print(f"  [{card['rank']}{card['suit']}]", end="")
+    print(f"  (очки: {calculate_score(player_hand)})")
+    
+    print("\nКарты дилера:")
+    for i, card in enumerate(dealer_hand):
+        if card['hidden'] and not show_dealer_all:
+            print("  [?]", end="")
+        else:
+            print(f"  [{card['rank']}{card['suit']}]", end="")
+    if show_dealer_all:
+        print(f"  (очки: {calculate_score(dealer_hand)})")
+    else:
+        print("  (одна карта скрыта)")
+    print("="*40)
+
+def has_blackjack(hand):
+    """Проверяет, есть ли у руки блэкджек (21 очко из двух карт)."""
+    return len(hand) == 2 and calculate_score(hand) == 21
+
+def player_turn(deck, player_hand, dealer_hand):
+    """Ход игрока: запрашивает действие, пока игрок не остановится или не переберёт."""
+    while True:
+        display_game(player_hand, dealer_hand)
+        action = input("Ваше действие: 1 - Взять карту (hit), 2 - Остановиться (stand): ").strip()
+        if action == '1' or action.lower() in ['hit', 'х']:
+            # Берём карту
+            player_hand.append(deck.pop(0))
+            score = calculate_score(player_hand)
+            if score > 21:
+                display_game(player_hand, dealer_hand)
+                print("*** ПЕРЕБОР! Вы проиграли. ***")
+                return 'bust'  # игрок перебрал
+        elif action == '2' or action.lower() in ['stand', 'с']:
+            print("Вы остановились.")
+            return 'stand'
+        else:
+            print("Некорректный ввод. Попробуйте снова.")
+
+def dealer_turn(deck, dealer_hand):
+    """Ход дилера: открывает карту и берёт до 17."""
+    # Открываем скрытую карту
+    for card in dealer_hand:
+        if card['hidden']:
+            card['hidden'] = False
+            break
+    
+    while calculate_score(dealer_hand) < 17:
+        dealer_hand.append(deck.pop(0))
+    
+    # Проверяем, не перебрал ли дилер
+    if calculate_score(dealer_hand) > 21:
+        return 'bust'
+    else:
+        return 'ok'
+
+def determine_winner(player_score, dealer_score):
+    """Определяет победителя по очкам."""
+    if player_score > 21:
+        return "dealer"  # уже обработано в player_turn, но на всякий случай
+    elif dealer_score > 21:
+        return "player"
+    elif player_score > dealer_score:
+        return "player"
+    elif player_score < dealer_score:
+        return "dealer"
+    else:
+        return "push"
+
+def play_game():
+    """Главная функция игры."""
+    print("Добро пожаловать в игру 21 (Blackjack)!")
+    
+    play_again = True
+    stats = {'games': 0, 'player_wins': 0, 'dealer_wins': 0, 'pushes': 0}
+    
+    while play_again:
+        # Подготовка колоды
+        deck = create_deck()
+        shuffle_deck(deck)
+        
+        # Раздача
+        player_hand, dealer_hand, deck = deal_initial_cards(deck)
+        
+        # Проверка на блэкджек у игрока и дилера сразу после раздачи
+        player_blackjack = has_blackjack(player_hand)
+        dealer_blackjack = has_blackjack(dealer_hand)
+        
+        if player_blackjack or dealer_blackjack:
+            # Открываем карты дилера для показа
+            for card in dealer_hand:
+                card['hidden'] = False
+            display_game(player_hand, dealer_hand, show_dealer_all=True)
+            
+            if player_blackjack and dealer_blackjack:
+                print("У обоих блэкджек! Ничья.")
+                result = 'push'
+            elif player_blackjack:
+                print("Блэкджек! Вы выиграли!")
+                result = 'player'
+            else:
+                print("У дилера блэкджек. Вы проиграли.")
+                result = 'dealer'
+        else:
+            # Ход игрока
+            outcome = player_turn(deck, player_hand, dealer_hand)
+            if outcome == 'bust':
+                result = 'dealer'
+            else:
+                # Ход дилера
+                dealer_outcome = dealer_turn(deck, dealer_hand)
+                # Показываем финальное состояние
+                display_game(player_hand, dealer_hand, show_dealer_all=True)
+                
+                if dealer_outcome == 'bust':
+                    print("Дилер перебрал! Вы выиграли!")
+                    result = 'player'
+                else:
+                    player_score = calculate_score(player_hand)
+                    dealer_score = calculate_score(dealer_hand)
+                    result = determine_winner(player_score, dealer_score)
+                    if result == 'player':
+                        print(f"Вы выиграли! {player_score} : {dealer_score}")
+                    elif result == 'dealer':
+                        print(f"Дилер выиграл. {player_score} : {dealer_score}")
+                    else:
+                        print(f"Ничья. {player_score} : {dealer_score}")
+        
+        # Обновление статистики
+        stats['games'] += 1
+        if result == 'player':
+            stats['player_wins'] += 1
+        elif result == 'dealer':
+            stats['dealer_wins'] += 1
+        else:
+            stats['pushes'] += 1
+        
+        # Запрос на повтор
+        ans = input("\nСыграть ещё раз? (д/н): ").strip().lower()
+        if ans not in ['д', 'да', 'y', 'yes']:
+            play_again = False
+    
+    # Вывод статистики
+    print("\n=== СТАТИСТИКА ===")
+    print(f"Всего игр: {stats['games']}")
+    print(f"Побед игрока: {stats['player_wins']}")
+    print(f"Побед дилера: {stats['dealer_wins']}")
+    print(f"Ничьих: {stats['pushes']}")
+    print("Спасибо за игру!")
+
+if __name__ == "__main__":
+    play_game()
