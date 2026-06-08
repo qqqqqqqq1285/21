@@ -1,0 +1,87 @@
+import tkinter as tk
+from tkinter import messagebox
+
+# Константы дизайн-системы из предыдущих коммитов
+C_BG = "#13271F"
+C_TABLE = "#1A382A"
+C_PANEL = "#224A36"
+C_GOLD = "#E6C27A"
+C_TEXT = "#F8F9FA"
+C_TEXT_DIM = "#A0B0A8"
+
+class BlackjackApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Blackjack")
+        self.geometry("1100x800")
+        self.configure(bg=C_BG)
+        
+        self.balance = 1000
+        self.current_bet = tk.IntVar(value=50)
+        self.bot_count = tk.IntVar(value=1)
+        
+        # Для теста сразу вызываем метод валидации и генерации стола
+        # В реальном приложении этот метод вызывается по нажатию кнопки "ИГРАТЬ"
+        self.after(100, self.start_game)
+
+    def clear(self):
+        for widget in self.winfo_children(): widget.destroy()
+
+    def start_game(self):
+        """Валидация ставки в блоке try-except и инициализация игрового пространства"""
+        try:
+            bet_val = self.current_bet.get()
+        except ValueError:
+            return messagebox.showerror("Ошибка", "Введите корректное число для ставки")
+
+        if bet_val > self.balance or bet_val <= 0:
+            return messagebox.showerror("Ошибка", "Некорректная ставка или недостаточно средств!")
+
+        self.balance -= bet_val
+        self.clear()
+
+        # Верхняя информационная панель (Шапка)
+        top = tk.Frame(self, bg=C_PANEL, height=60)
+        top.pack(fill="x", side="top")
+
+        tk.Label(top, text=f"БАЛАНС: ${self.balance}", font=("Segoe UI", 16, "bold"), bg=C_PANEL, fg=C_GOLD).pack(side="left", padx=30, pady=15)
+        tk.Label(top, text=f"СТАВКА: ${bet_val}", font=("Segoe UI", 16, "bold"), bg=C_PANEL, fg=C_TEXT).pack(side="left", padx=30, pady=15)
+
+        # Главный контейнер игрового стола (Зеленое сукно)
+        self.table = tk.Frame(self, bg=C_TABLE)
+        self.table.pack(expand=True, fill="both")
+
+        # Текстовая метка состояния игры (В центре экрана)
+        self.status_lbl = tk.Label(self.table, text="ИДЕТ РАЗДАЧА...", font=("Segoe UI", 20, "bold"), bg=C_TABLE, fg=C_GOLD)
+        self.status_lbl.place(relx=0.5, rely=0.45, anchor="center")
+
+        # Динамическое размещение игровых зон участников по относительным координатам
+        self.zones = {}
+        self.zones['dealer'] = self._create_zone("ДИЛЕР", 0.5, 0.15)
+        self.zones['player'] = self._create_zone("ВЫ", 0.5, 0.8)
+
+        # Отрисовка ботов в зависимости от выбранного количества
+        if self.bot_count.get() >= 1: 
+            self.zones['bot_0'] = self._create_zone("БОТ 1", 0.15, 0.5)
+        if self.bot_count.get() == 2: 
+            self.zones['bot_1'] = self._create_zone("БОТ 2", 0.85, 0.5)
+
+    def _create_zone(self, name, rx, ry):
+        """Инкапсулированный метод сборки и позиционирования игрового фрейма участника"""
+        f = tk.Frame(self.table, bg=C_TABLE)
+        f.place(relx=rx, rely=ry, anchor="center")
+        
+        lbl = tk.Label(f, text=name, font=("Segoe UI", 11, "bold"), bg=C_TABLE, fg=C_TEXT_DIM)
+        lbl.pack()
+        
+        cards = tk.Frame(f, bg=C_TABLE, height=130)
+        cards.pack()
+        
+        score = tk.Label(f, text="0", font=("Segoe UI", 16, "bold"), bg=C_TABLE, fg=C_GOLD)
+        score.pack()
+        
+        return {'cards': cards, 'score': score, 'name': lbl, 'hand': []}
+
+if __name__ == "__main__":
+    app = BlackjackApp()
+    app.mainloop()
