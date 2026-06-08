@@ -1,0 +1,428 @@
+# Автор: Пеньков Дмитрий Сергеевич
+# Проект: Игровая система «Blackjack» (Учебная практика)
+
+import tkinter as tk
+from tkinter import messagebox
+import random
+
+# ==================== СОВРЕМЕННАЯ ПАЛИТРА ====================
+C_BG = "#13271F"  # Очень темный зеленый (фон приложения)
+C_TABLE = "#1A382A"  # Изумрудное сукно стола
+C_PANEL = "#224A36"  # Панели и карточки
+C_GOLD = "#E6C27A"  # Мягкое золото для акцентов
+C_TEXT = "#F8F9FA"  # Почти белый текст
+C_TEXT_DIM = "#A0B0A8"  # Приглушенный текст
+C_BTN_GREEN = "#2E8B57"  # Зеленая кнопка
+C_BTN_GREEN_H = "#3CB371"  # Зеленая при наведении
+C_BTN_RED = "#B22222"  # Красная кнопка
+C_BTN_RED_H = "#CD5C5C"  # Красная при наведении
+
+FONT_TITLE = ("Segoe UI Semibold", 32)
+FONT_H1 = ("Segoe UI", 16, "bold")
+FONT_P = ("Segoe UI", 12)
+
+
+# ==================== КАСТОМНЫЕ СОВРЕМЕННЫЕ ВИДЖЕТЫ ====================
+def create_rounded_rect(canvas, x1, y1, x2, y2, r, **kwargs):
+    """Рисует идеально скругленный прямоугольник на Canvas"""
+    points = [
+        x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
+        x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1
+    ]
+    return canvas.create_polygon(points, smooth=True, **kwargs)
+
+
+class ModernButton(tk.Canvas):
+    """Стильная кнопка без стандартных квадратных рамок tkinter"""
+
+    def __init__(self, parent, text, command, width=160, height=45, bg=C_BTN_GREEN, hover_bg=C_BTN_GREEN_H):
+        super().__init__(parent, width=width, height=height, bg=parent['bg'], highlightthickness=0)
+        self.command = command
+        self.bg_color = bg
+        self.hover_color = hover_bg
+        self.text_str = text
+
+        self.rect_id = create_rounded_rect(self, 2, 2, width - 2, height - 2, 10, fill=self.bg_color)
+        self.text_id = self.create_text(width / 2, height / 2, text=text, font=("Segoe UI", 11, "bold"), fill="white")
+
+        self.bind("<Enter>", self.on_hover)
+        self.bind("<Leave>", self.on_leave)
+        self.bind("<Button-1>", self.on_click)
+        self.bind("<ButtonRelease-1>", self.on_release)
+        self.config(cursor="hand2")
+
+    def on_hover(self, event):
+        self.itemconfig(self.rect_id, fill=self.hover_color)
+
+    def on_leave(self, event):
+        self.itemconfig(self.rect_id, fill=self.bg_color)
+
+    def on_click(self, event):
+        self.itemconfig(self.rect_id, fill="#1E1E1E")
+        self.move(self.text_id, 0, 1)
+
+    def on_release(self, event):
+        self.itemconfig(self.rect_id, fill=self.hover_color)
+        self.move(self.text_id, 0, -1)
+        if self.command: self.command()
+
+
+# ==================== ЛОГИКА КАРТ ====================
+class Deck:
+    def __init__(self):
+        self.cards = [{'rank': r, 'suit': s, 'value': 10 if r in 'JQK' else (11 if r == 'A' else int(r)),
+                       'color': "#E74C3C" if s in '♥♦' else "#2C3E50"}
+                      for s in '♠♥♦♣' for r in ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']]
+        random.shuffle(self.cards)
+
+    def draw(self): return self.cards.pop() if self.cards else None
+
+
+class CardWidget(tk.Canvas):
+    def __init__(self, parent, card=None, hidden=False):
+        super().__init__(parent, width=84, height=124, bg=C_TABLE, highlightthickness=0)
+        self.card = card
+        self.hidden = hidden
+        self.w_current = 80
+        self.render()
+
+    def render(self):
+        self.delete("all")
+        if self.w_current <= 0: return
+
+        offset = (80 - self.w_current) / 2
+
+        if self.w_current > 40:
+            create_rounded_rect(self, 4 + offset, 4, 84 - offset, 124, 8, fill="#000000", stipple="gray25")
+
+        bg = "#FFFFFF" if not self.hidden else C_PANEL
+        create_rounded_rect(self, 2 + offset, 2, 82 - offset, 122, 8, fill=bg,
+                            outline="#7F8C8D" if not self.hidden else C_GOLD)
+
+        if self.w_current > 50:
+            if not self.hidden and self.card:
+                font_sz_r = int(20 * (self.w_current / 80))
+                font_sz_s = int(24 * (self.w_current / 80))
+                self.create_text(42, 45, text=self.card['rank'], font=("Arial", font_sz_r, "bold"),
+                                 fill=self.card['color'])
+                self.create_text(42, 80, text=self.card['suit'], font=("Arial", font_sz_s), fill=self.card['color'])
+            elif self.hidden:
+                self.create_line(42, 20, 42, 104, fill=C_GOLD, width=2)
+                self.create_line(20, 62, 64, 62, fill=C_GOLD, width=2)
+                self.create_oval(32, 52, 52, 72, outline=C_GOLD, width=2)
+
+    def flip(self, callback=None):
+        self._shrink(callback)
+
+    def _shrink(self, callback):
+        self.w_current -= 10
+        if self.w_current <= 0:
+            self.hidden = not self.hidden
+            self._grow(callback)
+        else:
+            self.render()
+            self.after(15, lambda: self._shrink(callback))
+
+    def _grow(self, callback):
+        self.w_current += 10
+        if self.w_current >= 80:
+            self.w_current = 80
+            self.render()
+            if callback: callback()
+        else:
+            self.render()
+            self.after(15, lambda: self._grow(callback))
+
+
+# ==================== ПРИЛОЖЕНИЕ ====================
+class BlackjackApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Blackjack")
+        self.geometry("1100x800")
+        self.configure(bg=C_BG)
+
+        self.balance = 1000
+        self.current_bet = tk.IntVar(value=50)
+        self.bot_count = tk.IntVar(value=1)
+
+        self.bind("<F11>", lambda e: self.attributes("-fullscreen", not self.attributes("-fullscreen")))
+        self.show_menu()
+
+    def clear(self):
+        for w in self.winfo_children(): w.destroy()
+
+    # --- СОВРЕМЕННОЕ МЕНЮ И ПРАВИЛА ---
+    def show_menu(self):
+        self.clear()
+
+        bg_canvas = tk.Canvas(self, bg=C_BG, highlightthickness=0)
+        bg_canvas.pack(fill="both", expand=True)
+        bg_canvas.create_oval(-100, -100, 400, 400, fill="#183626", outline="")
+        bg_canvas.create_oval(800, 500, 1300, 1000, fill="#183626", outline="")
+
+        card = tk.Frame(self, bg=C_PANEL, padx=50, pady=40)
+        card.place(relx=0.5, rely=0.5, anchor="center")
+
+        tk.Label(card, text="BLACKJACK", font=FONT_TITLE, bg=C_PANEL, fg=C_GOLD).pack(pady=(0, 30))
+
+        def create_input(parent, label, var, is_option=False, options=None):
+            f = tk.Frame(parent, bg=C_PANEL)
+            f.pack(fill="x", pady=10)
+            tk.Label(f, text=label, font=FONT_P, bg=C_PANEL, fg=C_TEXT_DIM, width=15, anchor="w").pack(side="left")
+            if is_option:
+                opt = tk.OptionMenu(f, var, *options)
+                opt.config(bg=C_BG, fg=C_TEXT, font=FONT_P, highlightthickness=0, relief="flat", activebackground=C_BG)
+                opt["menu"].config(bg=C_BG, fg=C_TEXT, font=FONT_P)
+                opt.pack(side="right", fill="x", expand=True)
+            else:
+                e = tk.Entry(f, textvariable=var, font=FONT_P, bg=C_BG, fg=C_TEXT, insertbackground=C_TEXT,
+                             relief="flat", bd=5)
+                e.pack(side="right", fill="x", expand=True)
+
+        create_input(card, "СТАВКА ($):", self.current_bet)
+        create_input(card, "КОЛ-ВО БОТОВ:", self.bot_count, True, [0, 1, 2])
+
+        tk.Label(card, text=f"ВАШ БАЛАНС: ${self.balance}", font=("Segoe UI", 10), bg=C_PANEL, fg=C_GOLD).pack(
+            pady=(20, 10))
+
+        btn_frame = tk.Frame(card, bg=C_PANEL)
+        btn_frame.pack(pady=10)
+
+        ModernButton(btn_frame, "ПРАВИЛА", self.show_rules, width=140, bg="#2980B9", hover_bg="#3498DB").pack(
+            side="left", padx=5)
+        ModernButton(btn_frame, "ИГРАТЬ", self.start_game, width=140).pack(side="left", padx=5)
+        ModernButton(btn_frame, "ВЫХОД", self.destroy, width=140, bg=C_BTN_RED, hover_bg=C_BTN_RED_H).pack(side="left",
+                                                                                                           padx=5)
+
+    def show_rules(self):
+        rules_win = tk.Toplevel(self)
+        rules_win.title("Правила игры")
+        rules_win.geometry("500x450")
+        rules_win.configure(bg=C_BG)
+        rules_win.resizable(False, False)
+
+        rules_win.transient(self)
+        rules_win.grab_set()
+
+        tk.Label(rules_win, text="ПРАВИЛА BLACKJACK", font=FONT_H1, bg=C_BG, fg=C_GOLD).pack(pady=10)
+
+        text_frame = tk.Frame(rules_win, bg=C_BG)
+        text_frame.pack(padx=20, pady=10, fill="both", expand=True)
+
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.pack(side="right", fill="y")
+
+        rules_text_widget = tk.Text(text_frame, font=FONT_P, bg=C_BG, fg=C_TEXT, wrap="word",
+                                    yscrollcommand=scrollbar.set, bd=0, highlightthickness=0)
+        rules_text_widget.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=rules_text_widget.yview)
+
+        rules_text_content = (
+            "1. Цель игры — набрать сумму очков, максимально близкую к 21, но не превышающую её.\n\n"
+            "2. Карты от 2 до 10 дают соответствующие очки по номиналу.\n\n"
+            "3. Валет (J), Дама (Q) и Король (K) дают по 10 очков.\n\n"
+            "4. Туз (A) дает 11 очков. Если сумма очков в руке превышает 21, Туз автоматически считается как 1 очко (мягкий Туз).\n\n"
+            "5. Дилер вскрывает свои скрытые карты последним. Он обязан брать дополнительные карты до тех пор, пока сумма его очков меньше 17.\n\n"
+            "6. Перебор (больше 21 очка) означает моментальный проигрыш для игрока или дилера.\n\n"
+            "7. Наличие ровно 21 очка с первых двух розданных карт (Туз + любая карта номиналом 10) — это Блэкджек! В этом случае выигрыш выплачивается в соотношении 3 к 2.\n\n"
+            "8. БОТЫ: В главном меню вы можете настроить участие 1 или 2 ботов. Они управляются алгоритмами компьютера и играют по стратегии дилера, завершая ход при 17 очках.\n\n"
+            "9. СТАВКИ И БАЛАНС: Если вы выигрываете у дилера по очкам, ваша первоначальная ставка удваивается. При Блэкджеке выплата составляет 2.5 от ставки. При ничьей (равное количество очков с дилером) ваша ставка просто возвращается на баланс."
+        )
+
+        rules_text_widget.insert("1.0", rules_text_content)
+        rules_text_widget.config(state="disabled")
+
+        ModernButton(rules_win, "ЗАКРЫТЬ", rules_win.destroy, width=150, bg=C_BTN_RED, hover_bg=C_BTN_RED_H).pack(
+            pady=15)
+
+    # --- ИГРОВОЙ СТОЛ ---
+    def start_game(self):
+        try:
+            bet_val = self.current_bet.get()
+        except ValueError:
+            return messagebox.showerror("Ошибка", "Введите корректное число для ставки")
+
+        if bet_val > self.balance or bet_val <= 0:
+            return messagebox.showerror("Ошибка", "Некорректная ставка или недостаточно средств!")
+
+        self.balance -= bet_val
+        self.clear()
+
+        top = tk.Frame(self, bg=C_PANEL, height=60)
+        top.pack(fill="x", side="top")
+
+        tk.Label(top, text=f"БАЛАНС: ${self.balance}", font=FONT_H1, bg=C_PANEL, fg=C_GOLD).pack(side="left", padx=30,
+                                                                                                 pady=15)
+        tk.Label(top, text=f"СТАВКА: ${self.current_bet.get()}", font=FONT_H1, bg=C_PANEL, fg=C_TEXT).pack(side="left",
+                                                                                                           padx=30,
+                                                                                                           pady=15)
+        ModernButton(top, "В МЕНЮ", self.show_menu, width=120, height=35, bg=C_BTN_RED, hover_bg=C_BTN_RED_H).pack(
+            side="right", padx=20, pady=10)
+
+        self.table = tk.Frame(self, bg=C_TABLE)
+        self.table.pack(expand=True, fill="both")
+
+        self.status_lbl = tk.Label(self.table, text="", font=("Segoe UI", 20, "bold"), bg=C_TABLE, fg=C_GOLD)
+        self.status_lbl.place(relx=0.5, rely=0.45, anchor="center")
+
+        self.zones = {}
+        self.zones['dealer'] = self._create_zone("ДИЛЕР", 0.5, 0.15)
+        self.zones['player'] = self._create_zone("ВЫ", 0.5, 0.8)
+
+        if self.bot_count.get() >= 1: self.zones['bot_0'] = self._create_zone("БОТ 1", 0.15, 0.5)
+        if self.bot_count.get() == 2: self.zones['bot_1'] = self._create_zone("БОТ 2", 0.85, 0.5)
+
+        self.controls = tk.Frame(self.table, bg=C_TABLE)
+        ModernButton(self.controls, "ВЗЯТЬ", self.action_hit, width=140).pack(side="left", padx=10)
+        ModernButton(self.controls, "ПАС", self.action_stand, width=140, bg="#D35400", hover_bg="#E67E22").pack(
+            side="left", padx=10)
+
+        self.start_round()
+
+    def _create_zone(self, name, rx, ry):
+        f = tk.Frame(self.table, bg=C_TABLE)
+        f.place(relx=rx, rely=ry, anchor="center")
+        lbl = tk.Label(f, text=name, font=("Segoe UI", 11, "bold"), bg=C_TABLE, fg=C_TEXT_DIM)
+        lbl.pack()
+        cards = tk.Frame(f, bg=C_TABLE, height=130)
+        cards.pack()
+        score = tk.Label(f, text="", font=FONT_H1, bg=C_TABLE, fg=C_GOLD)
+        score.pack()
+        return {'cards': cards, 'score': score, 'name': lbl, 'hand': []}
+
+    # --- ЛОГИКА РАЗДАЧИ ---
+    def start_round(self):
+        self.deck = Deck()
+        self.turn_queue = [k for k in ['bot_0', 'bot_1'] if k in self.zones] + ['player', 'dealer']
+        self._animate_deal()
+
+    def _animate_deal(self):
+        tasks = [(k, r) for r in range(2) for k in self.turn_queue[:-1] + ['dealer']]
+
+        def deal_step(idx):
+            if idx < len(tasks):
+                k, rnd = tasks[idx]
+                card = self.deck.draw()
+                self.zones[k]['hand'].append(card)
+
+                is_hidden = (k == 'dealer' and rnd == 0)
+                cw = CardWidget(self.zones[k]['cards'], card, hidden=True)
+                cw.pack(side="left", padx=2)
+
+                if not is_hidden: cw.flip(lambda: self._update_score(k))
+                self.after(200, lambda: deal_step(idx + 1))
+            else:
+                self.after(400, self.next_turn)
+
+        deal_step(0)
+
+    # --- ИГРОВОЙ ЦИКЛ ---
+    def next_turn(self):
+        for k in self.zones: self.zones[k]['name'].config(fg=C_TEXT_DIM)
+        self.controls.place_forget()
+
+        if not self.turn_queue: return self.end_round()
+
+        current = self.turn_queue.pop(0)
+        self.active = current
+        self.zones[current]['name'].config(fg="#2ECC71")
+
+        score = self._calc(self.zones[current]['hand'])
+        if score == 21:
+            self.status_lbl.config(text="БЛЭКДЖЕК!")
+            self.after(1000, self.next_turn)
+            return
+
+        if current.startswith('bot'):
+            self.status_lbl.config(text=f"Ход: {self.zones[current]['name'].cget('text')}")
+            self.after(800, self.bot_play)
+        elif current == 'player':
+            self.status_lbl.config(text="ВАШ ХОД")
+            self.controls.place(relx=0.5, rely=0.92, anchor="center")
+        elif current == 'dealer':
+            self.status_lbl.config(text="Ход Дилера")
+            self.zones['dealer']['cards'].winfo_children()[0].flip(lambda: self.after(600, self.dealer_play))
+
+    def bot_play(self):
+        if self._calc(self.zones[self.active]['hand']) < 17:
+            self._draw_card(self.active, lambda: self.after(800, self.bot_play))
+        else:
+            self.after(500, self.next_turn)
+
+    def dealer_play(self):
+        self._update_score('dealer')
+        if self._calc(self.zones['dealer']['hand']) < 17:
+            self._draw_card('dealer', lambda: self.after(800, self.dealer_play))
+        else:
+            self.after(800, self.next_turn)
+
+    def action_hit(self):
+        self.controls.place_forget()
+        self._draw_card('player', self.check_player)
+
+    def action_stand(self):
+        self.controls.place_forget()
+        self.next_turn()
+
+    def check_player(self):
+        score = self._calc(self.zones['player']['hand'])
+        if score >= 21:
+            self.after(800, self.next_turn)
+        else:
+            self.controls.place(relx=0.5, rely=0.92, anchor="center")
+
+    def _draw_card(self, key, callback):
+        c = self.deck.draw()
+        self.zones[key]['hand'].append(c)
+        cw = CardWidget(self.zones[key]['cards'], c, hidden=True)
+        cw.pack(side="left", padx=2)
+        cw.flip(lambda: [self._update_score(key), callback()])
+
+    def _calc(self, hand):
+        v = sum(c['value'] for c in hand)
+        a = sum(1 for c in hand if c['rank'] == 'A')
+        while v > 21 and a: v -= 10; a -= 1
+        return v
+
+    def _update_score(self, key):
+        s = self._calc(self.zones[key]['hand'])
+        self.zones[key]['score'].config(text=str(s), fg=C_BTN_RED if s > 21 else C_GOLD)
+
+    # --- ИТОГИ ---
+    def end_round(self):
+        ps = self._calc(self.zones['player']['hand'])
+        ds = self._calc(self.zones['dealer']['hand'])
+        p_bj = (ps == 21 and len(self.zones['player']['hand']) == 2)
+        d_bj = (ds == 21 and len(self.zones['dealer']['hand']) == 2)
+
+        if ps > 21:
+            res = "ПЕРЕБОР. ВЫ ПРОИГРАЛИ."
+        elif p_bj and not d_bj:
+            res = "БЛЭКДЖЕК! (3:2)"
+            self.balance += int(self.current_bet.get() * 2.5)
+        elif ds > 21 or ps > ds:
+            res = "ВЫ ВЫИГРАЛИ!"
+            self.balance += self.current_bet.get() * 2
+        elif ps == ds:
+            res = "НИЧЬЯ"
+            self.balance += self.current_bet.get()
+        else:
+            res = "ДИЛЕР ВЫИГРАЛ."
+
+        self.status_lbl.config(text=res)
+
+        self.btn_next = ModernButton(self.table, "НОВАЯ РАЗДАЧА", self.start_game, width=200, bg="#2980B9",
+                                     hover_bg="#3498DB")
+        self.btn_next.place(relx=0.5, rely=0.6, anchor="center")
+
+
+if __name__ == "__main__":
+    try:
+        from ctypes import windll
+
+        windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+
+    BlackjackApp().mainloop()
