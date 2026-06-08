@@ -1,0 +1,83 @@
+import tkinter as tk
+
+# Константы палитры из Коммита 3
+C_BG = "#13271F"
+C_PANEL = "#224A36"
+C_GOLD = "#E6C27A"
+C_TEXT = "#F8F9FA"
+C_TEXT_DIM = "#A0B0A8"
+C_BTN_GREEN = "#2E8B57"
+C_BTN_GREEN_H = "#3CB371"
+
+FONT_TITLE = ("Segoe UI Semibold", 32)
+FONT_P = ("Segoe UI", 12)
+
+def create_rounded_rect(canvas, x1, y1, x2, y2, r, **kwargs):
+    """Вспомогательный метод рисования скругленного прямоугольника на Canvas"""
+    points = [
+        x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
+        x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1
+    ]
+    return canvas.create_polygon(points, smooth=True, **kwargs)
+
+class ModernButton(tk.Canvas):
+    """Кастомный класс стильной скругленной кнопки с анимацией наведения"""
+    def __init__(self, parent, text, command, width=160, height=45, bg=C_BTN_GREEN, hover_bg=C_BTN_GREEN_H):
+        super().__init__(parent, width=width, height=height, bg=parent['bg'], highlightthickness=0)
+        self.command = command
+        self.bg = bg
+        self.hover_bg = hover_bg
+        
+        # Отрисовка формы и текста
+        self.rect = create_rounded_rect(self, 2, 2, width-2, height-2, 10, fill=self.bg)
+        self.text_id = self.create_text(width/2, height/2, text=text, fill=C_TEXT, font=("Segoe UI", 12, "bold"))
+        
+        # Привязка событий мыши
+        self.bind("<Enter>", lambda e: self.itemconfig(self.rect, fill=self.hover_bg))
+        self.bind("<Leave>", lambda e: self.itemconfig(self.rect, fill=self.bg))
+        self.bind("<Button-1>", lambda e: self.command())
+
+class BlackjackApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Blackjack")
+        self.geometry("1100x800")
+        self.configure(bg=C_BG)
+        
+        self.balance = 1000
+        self.current_bet = tk.IntVar(value=50)
+        self.bot_count = tk.IntVar(value=1)
+        
+        self.show_menu()
+
+    def clear(self):
+        for widget in self.winfo_children(): widget.destroy()
+
+    def show_menu(self):
+        """Интерфейс Главного меню"""
+        self.clear()
+        
+        # Задний фон с векторными кругами
+        bg_canvas = tk.Canvas(self, bg=C_BG, highlightthickness=0)
+        bg_canvas.pack(fill="both", expand=True)
+        bg_canvas.create_oval(-100, -100, 400, 400, fill="#183626", outline="")
+        bg_canvas.create_oval(800, 500, 1300, 1000, fill="#183626", outline="")
+        
+        # Центральная карточка меню
+        card = tk.Frame(self, bg=C_PANEL, padx=50, pady=40)
+        card.place(relx=0.5, rely=0.5, anchor="center")
+        
+        tk.Label(card, text="BLACKJACK", font=FONT_TITLE, bg=C_PANEL, fg=C_GOLD).pack(pady=(0, 30))
+        
+        # Поле ввода ставки
+        f1 = tk.Frame(card, bg=C_PANEL)
+        f1.pack(fill="x", pady=10)
+        tk.Label(f1, text="СТАВКА ($):", font=FONT_P, bg=C_PANEL, fg=C_TEXT_DIM, width=12, anchor="w").pack(side="left")
+        tk.Entry(f1, textvariable=self.current_bet, font=FONT_P, bg=C_BG, fg=C_TEXT, bd=3, relief="flat").pack(side="right")
+        
+        # Кнопка запуска (заглушка)
+        ModernButton(card, "ИГРАТЬ", lambda: print("Старт раунда"), width=200).pack(pady=(20, 0))
+
+if __name__ == "__main__":
+    app = BlackjackApp()
+    app.mainloop()
