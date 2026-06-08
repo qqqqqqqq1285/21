@@ -1,0 +1,36 @@
+import tkinter as tk
+import random
+
+# ==================== СОВРЕМЕННАЯ ПАЛИТРА И ДИЗАЙН-СИСТЕМА ====================
+C_BG = "#13271F"        # Очень темный зеленый (фон приложения)
+C_TABLE = "#1A382A"     # Изумрудное сукно стола
+C_PANEL = "#224A36"     # Панели и карточки
+C_GOLD = "#E6C27A"      # Мягкое золото для акцентов
+C_TEXT = "#F8F9FA"      # Почти белый текст
+
+FONT_TITLE = ("Segoe UI Semibold", 32)
+FONT_H1 = ("Segoe UI", 16, "bold")
+FONT_P = ("Segoe UI", 12)
+
+class BlackjackApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Blackjack")
+        self.geometry("1100x800")
+        self.configure(bg=C_BG)
+        
+        # Переменные состояния ядра программы
+        self.balance = 1000
+        
+        # Запуск пустого тестового окна для проверки палитры
+        self.test_label = tk.Label(self, text="BLACKJACK ENGINE GUI", font=FONT_TITLE, bg=C_BG, fg=C_GOLD)
+        self.test_label.pack(expand=True)
+
+    def clear(self):
+        """Метод очистки экрана для динамической смены окон"""
+        for widget in self.winfo_children():
+            widget.destroy()
+
+if __name__ == "__main__":
+    app = BlackjackApp()
+    app.mainloop()
