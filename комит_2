@@ -1,0 +1,39 @@
+import random
+
+def create_deck():
+    suits = ['♠', '♣', '♥', '♦']
+    ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    deck = []
+    for suit in suits:
+        for rank in ranks:
+            if rank in ['J', 'Q', 'K']: value = 10
+            elif rank == 'A': value = 11
+            else: value = int(rank)
+            color = "#B22222" if suit in ['♥', '♦'] else "#000000"
+            deck.append({'rank': rank, 'suit': suit, 'value': value, 'color': color})
+    return deck
+
+def calc_score(hand):
+    """Продвинутый расчет очков с учетом динамического правила мягкого Туза"""
+    total = sum(card['value'] for card in hand)
+    ace_count = sum(1 for card in hand if card['rank'] == 'A')
+    
+    # Пока зафиксирован перебор и в руке есть Тузы, считаем их как 1, а не 11
+    while total > 21 and ace_count > 0:
+        total -= 10
+        ace_count -= 1
+    return total
+
+# Тест обработки перебора с Тузами
+if __name__ == "__main__":
+    deck = create_deck()
+    # Искусственно создаем руку: Туз, Король и еще один Туз (11 + 10 + 11 = 32 -> перебор)
+    test_hand = [
+        {'rank': 'A', 'suit': '♠', 'value': 11},
+        {'rank': 'K', 'suit': '♥', 'value': 10},
+        {'rank': 'A', 'suit': '♦', 'value': 11}
+    ]
+    
+    print("Тест мягкого Туза:")
+    print(f"Карты: {[c['rank'] for c in test_hand]}")
+    print(f"Итоговые очки (должно быть 12): {calc_score(test_hand)}")
