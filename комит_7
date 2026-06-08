@@ -1,0 +1,88 @@
+import tkinter as tk
+import random
+
+# Константы дизайн-системы из предыдущих коммитов
+C_TABLE = "#1A382A"
+C_PANEL = "#224A36"
+C_GOLD = "#E6C27A"
+
+def create_rounded_rect(canvas, x1, y1, x2, y2, r, **kwargs):
+    points = [
+        x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
+        x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1
+    ]
+    return canvas.create_polygon(points, smooth=True, **kwargs)
+
+class CardWidget(tk.Canvas):
+    """Кастомный виджет карты на Canvas с покадровой анимацией вращения"""
+    def __init__(self, parent, card=None, hidden=False):
+        super().__init__(parent, width=84, height=124, bg=C_TABLE, highlightthickness=0)
+        self.card = card
+        self.hidden = hidden
+        self.w_current = 80  # Текущая ширина карты для симуляции вращения
+        self.render()
+
+    def render(self):
+        self.delete("all")
+        if self.w_current <= 0: return
+
+        offset = (80 - self.w_current) / 2
+
+        # Отрисовка тени карты
+        if self.w_current > 40:
+            create_rounded_rect(self, 4 + offset, 4, 84 - offset, 124, 8, fill="#000000", stipple="gray25")
+
+        # Определение цвета подложки (лицо или рубашка)
+        bg = "#FFFFFF" if not self.hidden else C_PANEL
+        create_rounded_rect(self, 2 + offset, 2, 82 - offset, 122, 8, fill=bg,
+                            outline="#7F8C8D" if not self.hidden else C_GOLD)
+
+        # Вывод содержимого при достаточной ширине кадра
+        if self.w_current > 50:
+            if not self.hidden and self.card:
+                font_sz_r = int(20 * (self.w_current / 80))
+                font_sz_s = int(24 * (self.w_current / 80))
+                self.create_text(42, 45, text=self.card['rank'], font=("Arial", font_sz_r, "bold"), fill=self.card['color'])
+                self.create_text(42, 80, text=self.card['suit'], font=("Arial", font_sz_s), fill=self.card['color'])
+            elif self.hidden:
+                # Векторный узор рубашки карты
+                self.create_line(42, 20, 42, 104, fill=C_GOLD, width=2)
+                self.create_line(20, 62, 64, 62, fill=C_GOLD, width=2)
+                self.create_oval(32, 52, 52, 72, outline=C_GOLD, width=2)
+
+    def flip(self, callback=None):
+        """Публичный метод запуска переворота карты"""
+        self._shrink(callback)
+
+    def _shrink(self, callback):
+        self.w_current -= 10
+        if self.w_current <= 0:
+            self.hidden = not self.hidden
+            self._grow(callback)
+        else:
+            self.render()
+            self.after(15, lambda: self._shrink(callback))
+
+    def _grow(self, callback):
+        self.w_current += 10
+        if self.w_current >= 80:
+            self.w_current = 80
+            self.render()
+            if callback: callback()
+        else:
+            self.render()
+            self.after(15, lambda: self._grow(callback))
+
+# Тестовый стенд для проверки анимации виджета
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.configure(bg=C_TABLE)
+    root.geometry("200x200")
+    
+    test_card = {'rank': 'A', 'suit': '♠', 'color': '#2C3E50'}
+    cw = CardWidget(root, card=test_card, hidden=True)
+    cw.pack(pady=10)
+    
+    # Кнопка для теста флипа
+    tk.Button(root, text="Перевернуть", command=cw.flip).pack()
+    root.mainloop()
